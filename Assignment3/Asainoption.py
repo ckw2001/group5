@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.stats import norm
+import pandas as pd
 
 class AsianOptionPricer:
     """
@@ -18,7 +19,7 @@ class AsianOptionPricer:
         self.n = n  # Number of observation times
         self.option_type = option_type  # 'call' or 'put'
 
-    def _generate_price_paths(self, M, dt):
+    def generate_price_paths(self, M, dt):
         """
         Generates simulated price paths for the underlying asset using Geometric Brownian Motion.
         """
@@ -51,7 +52,7 @@ class AsianOptionPricer:
             N1 = norm.cdf(-d1)
             N2 = norm.cdf(-d2)
             price = np.exp(-self.r * self.T) * (self.K * N2 - self.S0 * np.exp(muT) * N1)
-        return price
+        return {'geometric_price': price}
 
 
 
@@ -62,30 +63,38 @@ class AsianOptionPricer:
         Prices an arithmetic Asian option using Monte Carlo simulation.
         """
         dt = self.T / self.n
-        paths = self._generate_price_paths(M, dt)
+        paths = self.generate_price_paths(M, dt)
         arithmetic_means = np.mean(paths, axis=1)
         geometric_means = np.exp(np.sum(np.log(paths), axis=1) / self.n)
 
         if self.option_type == 'call':
-            payoffs = np.exp(-self.r * self.T) * np.maximum(arithmetic_means - self.K, 0)
+            arithPayoff = np.exp(-self.r * self.T) * np.maximum(arithmetic_means - self.K, 0)
             geometric_payoffs=np.exp(-self.r * self.T) * np.maximum(geometric_means - self.K, 0)
         else:
-            payoffs = np.exp(-self.r * self.T) * np.maximum(self.K - arithmetic_means, 0)
+            arithPayoff = np.exp(-self.r * self.T) * np.maximum(self.K - arithmetic_means, 0)
             geometric_payoffs = np.exp(-self.r * self.T) * np.maximum(self.K - geometric_means, 0)
         
-        if use_control_variate:
-            geometric_price = self.price_geometric_option()
-            cov_xy =  np.mean(np.multiply(payoffs,geometric_payoffs))- np.mean(payoffs)*np.mean(geometric_payoffs) 
-            theta = cov_xy / np.var(geometric_payoffs)
-            payoffs -= theta * (geometric_payoffs - geometric_price)
 
-        price_estimate = np.mean(payoffs)
-        price_std = np.std(payoffs)
-        confidence_interval = [
-            price_estimate - 1.96 * price_std / np.sqrt(M),
-            price_estimate + 1.96 * price_std / np.sqrt(M)
-        ]
-        return price_estimate, confidence_interval
+        if not use_control_variate:
+            Pmean = np.mean(arithPayoff)
+            Pstd = np.std(arithPayoff)
+            confmc = [Pmean - 1.96 * Pstd / np.sqrt(M), Pmean + 1.96 * Pstd / np.sqrt(M)]
+            return {'arithmetic_price': Pmean, 'confidence_interval': confmc}
+
+
+
+
+
+        else :
+            geometric_price = self.price_geometric_option()['geometric_price']
+            cov_xy =  np.mean(np.multiply(arithPayoff,geometric_payoffs))- np.mean(arithPayoff)*np.mean(geometric_payoffs) 
+            theta = cov_xy / np.var(geometric_payoffs)
+            Z=arithPayoff + theta * (geometric_price - geometric_payoffs)
+
+            Zmean = np.mean(Z)
+            Zstd = np.std(Z)
+            confcv = [Zmean - 1.96 * Zstd / np.sqrt(M), Zmean + 1.96 * Zstd / np.sqrt(M)]
+            return {'arithmetic_price': Zmean, 'confidence_interval': confcv}
 
 # Function to run test cases
 def test_option_pricing():
@@ -100,18 +109,43 @@ def test_option_pricing():
     ]
     M = 100000  # Number of simulation paths
 
-    # Print the header for the output
-    print(f"{'sigma':<10}{'K':<10}{'n':<10}{'option_type':<15}{'Geometric':<20}{'Arithmetic MC':<20}{'MC Confidence Interval':<40}{'Arithmetic Control Variate':<30}{'Control Variate Confidence Interval':<40}")
+    results = {'Sigma': [], 'K': [], 'n': [], 'Option Type': [], 'Geometric': [],
+               'Arithmetic Without CV': [], 'Interval Without CV': [], 'Arithmetic_cv': [],
+               'Confidence Interval_cv': []}
 
     # Iterate through each test case and price the options
     for case in test_cases:
         pricer = AsianOptionPricer(**case)
-        geometric_price = pricer.price_geometric_option()
-        arithmetic_price, arithmetic_confidence = pricer.price_arithmetic_option(M, False)
-        arithmetic_price_cv, arithmetic_confidence_cv = pricer.price_arithmetic_option(M, True)
+        geometric_price = pricer.price_geometric_option()['geometric_price']
         
-        # Format the output as specified
-        print(f"{case['sigma']:<10}{case['K']:<10}{case['n']:<10}{case['option_type']:<15}{geometric_price:<20.4f}{arithmetic_price:<20.4f}{'[' + ', '.join(f'{i:.4f}' for i in arithmetic_confidence) + ']':<40}{arithmetic_price_cv:<30.4f}{'[' + ', '.join(f'{i:.4f}' for i in arithmetic_confidence_cv) + ']':<40}")
+        arithmetic_result_without_cv = pricer.price_arithmetic_option(M, use_control_variate=False)
+        arithmetic_price_without_cv = arithmetic_result_without_cv['arithmetic_price']
+        arithmetic_interval_without_cv = arithmetic_result_without_cv['confidence_interval']
+
+        arithmetic_result_with_cv = pricer.price_arithmetic_option(M, use_control_variate=True)
+        arithmetic_price_with_cv = arithmetic_result_with_cv['arithmetic_price']
+        arithmetic_interval_with_cv = arithmetic_result_with_cv['confidence_interval']
+
+        # Store the results
+        results['Sigma'].append(case['sigma'])
+        results['K'].append(case['K'])
+        results['n'].append(case['n'])
+        results['Option Type'].append(case['option_type'])
+        results['Geometric'].append(geometric_price)
+        results['Arithmetic Without CV'].append(arithmetic_price_without_cv)
+        results['Interval Without CV'].append(arithmetic_interval_without_cv)
+        results['Arithmetic_cv'].append(arithmetic_price_with_cv)
+        results['Confidence Interval_cv'].append(arithmetic_interval_with_cv)
+
+    # Convert results to a DataFrame
+    df = pd.DataFrame(results)
+    return df
 
 # Run the test cases
-test_option_pricing()
+print(test_option_pricing())
+
+
+
+
+
+
