@@ -64,19 +64,18 @@ class AsianOptionPricer:
         dt = self.T / self.n
         paths = self._generate_price_paths(M, dt)
         arithmetic_means = np.mean(paths, axis=1)
-        
+        geometric_means = np.exp(np.sum(np.log(paths), axis=1) / self.n)
+
         if self.option_type == 'call':
             payoffs = np.exp(-self.r * self.T) * np.maximum(arithmetic_means - self.K, 0)
-            geometric_payoffs = np.exp(-self.r * self.T) * np.maximum(geometric_means - self.K, 0)
-
+            geometric_payoffs=np.exp(-self.r * self.T) * np.maximum(geometric_means - self.K, 0)
         else:
             payoffs = np.exp(-self.r * self.T) * np.maximum(self.K - arithmetic_means, 0)
             geometric_payoffs = np.exp(-self.r * self.T) * np.maximum(self.K - geometric_means, 0)
-
+        
         if use_control_variate:
-            geometric_means = np.exp(np.sum(np.log(paths), axis=1) / self.n)
             geometric_price = self.price_geometric_option()
-            cov_xy = np.cov(payoffs, geometric_payoffs)[0, 1]
+            cov_xy =  np.mean(np.multiply(payoffs,geometric_payoffs))- np.mean(payoffs)*np.mean(geometric_payoffs) 
             theta = cov_xy / np.var(geometric_payoffs)
             payoffs -= theta * (geometric_payoffs - geometric_price)
 
@@ -112,7 +111,7 @@ def test_option_pricing():
         arithmetic_price_cv, arithmetic_confidence_cv = pricer.price_arithmetic_option(M, True)
         
         # Format the output as specified
-        print(f"{case['sigma']:<10}{case['K']:<10}{case['n']:<10}{case['option_type']:<15}{geometric_price:<20.4f}{arithmetic_price:<20.4f}{'[' + ', '.join(f'{i:.2f}' for i in arithmetic_confidence) + ']':<40}{arithmetic_price_cv:<30.4f}{'[' + ', '.join(f'{i:.2f}' for i in arithmetic_confidence_cv) + ']':<40}")
+        print(f"{case['sigma']:<10}{case['K']:<10}{case['n']:<10}{case['option_type']:<15}{geometric_price:<20.4f}{arithmetic_price:<20.4f}{'[' + ', '.join(f'{i:.4f}' for i in arithmetic_confidence) + ']':<40}{arithmetic_price_cv:<30.4f}{'[' + ', '.join(f'{i:.4f}' for i in arithmetic_confidence_cv) + ']':<40}")
 
 # Run the test cases
 test_option_pricing()
