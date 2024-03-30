@@ -2,10 +2,10 @@ from math import sqrt, log, exp
 from scipy.stats import norm
 import numpy as np
 import pandas as pd
+ 
    
    
-   
-   # arithmetic_basket和geometric_basket是你需要的两个函数 @王艺洁
+#arithmetic_basket和geometric_basket是你需要的两个函数 @王艺洁
 
 
 
@@ -180,11 +180,11 @@ def test_basket_option_pricer():
     # Create a DataFrame from the results list
     results_df = pd.DataFrame(results)
     
-    # Display the DataFrame
-    display(results_df)
+    # Display the DataFramec
+    print(results_df)
     
     #Output the DataFrame to a CSV file
-    results_df.to_csv('option_pricing_results.csv', index=False)
+    results_df.to_csv('basketoption.csv', index=False)    
     
     return results_df
 

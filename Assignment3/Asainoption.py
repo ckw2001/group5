@@ -2,6 +2,10 @@ import numpy as np
 from scipy.stats import norm
 import pandas as pd
 
+#price_arithmetic_option和price_geometric_option是你需要的两个函数 @王艺洁
+
+
+
 class AsianOptionPricer:
     """
     A class for pricing Asian options using Monte Carlo simulation, with an
@@ -139,6 +143,9 @@ def test_option_pricing():
 
     # Convert results to a DataFrame
     df = pd.DataFrame(results)
+
+    df.to_csv('asainoption.csv', index=False)    
+
     return df
 
 # Run the test cases
