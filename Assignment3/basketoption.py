@@ -2,19 +2,28 @@ from math import sqrt, log, exp
 from scipy.stats import norm
 import numpy as np
 import pandas as pd
+   
+   
+   
+   # arithmetic_basket和geometric_basket是你需要的两个函数 @王艺洁
+
+
+
+
 class BasketOptionPricer:
     def __init__(self, S1,S2, K, T, sigma1,sigma2, r, rho, option_type):
-        assert option_type in ('call', 'put'), "Option type must be 'call' or 'put'"
-        self.S1 = S1
-        self.S2 = S2
-        self.K = K
-        self.T = T
-        self.sigma1=sigma1
-        self.sigma2=sigma2
-        self.r = r
-        self.rho = rho  # Correlation matrix or scalar
-        self.option_type = option_type
+        self.S1 = S1        # Initial stock price of asset1
+        self.S2 = S2        # Initial stock price of asset2
+        self.K = K          # Strike price of the option
+        self.T = T          # Time to maturity of the option
+        self.sigma1=sigma1  # Volatility of the asset1
+        self.sigma2=sigma2  # Volatility of the asset2
+        self.r = r          # Risk-free interest rate
+        self.rho = rho      # Correlation matrix or scalar
+        self.option_type = option_type  # 'call' or 'put'
 
+
+    #another two parameters below: M and control_variate will be used  in arithmetic_basket method and will not defined here
 
     def geometric_basket(self):
         n = 2  # Number of assets in basket
@@ -39,7 +48,10 @@ class BasketOptionPricer:
         else:
             price = exp(-self.r * self.T) * (self.K * norm.cdf(-d2) - B * exp(mu_b * self.T) * norm.cdf(-d1))
 
-        return price
+        return {'geometric_price': price}
+
+
+
 
     def price_path(self,M):
         np.random.seed(100)#Fixing the seed for reproducibility
@@ -63,7 +75,7 @@ class BasketOptionPricer:
         return S1Path,S2Path
     
 
-    def arithmetic_basket(self,M,control_variate=False):
+    def arithmetic_basket(self,M,control_variate):
         """
         Prices an arithmetic basket option using Monte Carlo simulation,
         with optional control variate technique.
@@ -83,11 +95,11 @@ class BasketOptionPricer:
             Pmean = np.mean(arithPayoff)
             Pstd = np.std(arithPayoff)
             confmc = [Pmean - 1.96 * Pstd / np.sqrt(M), Pmean + 1.96 * Pstd / np.sqrt(M)]
-            return Pmean, confmc
+            return {'arithmetic_price': Pmean, 'confidence_interval': confmc}
 
         # Control variate using geometric basket price
         else:
-            geoPrice = self.geometric_basket()  # Closed form solution for geometric basket
+            geoPrice = self.geometric_basket()['geometric_price']  # Closed form solution for geometric basket
             # Covariance and variance for the control variate technique
             covXY = np.mean(np.multiply(arithPayoff,geoPayoff))- np.mean(arithPayoff)*np.mean(geoPayoff) 
             theta = covXY / np.var(geoPayoff)
@@ -95,7 +107,7 @@ class BasketOptionPricer:
             Zmean = np.mean(Z)
             Zstd = np.std(Z)
             confcv = [Zmean - 1.96 * Zstd / np.sqrt(M), Zmean + 1.96 * Zstd / np.sqrt(M)]
-            return Zmean, confcv
+            return {'arithmetic_price': Zmean, 'confidence_interval': confcv}
 
 
 
@@ -133,15 +145,18 @@ def test_basket_option_pricer():
             option_type=params['type'],
         )
         M = 100000
-
         # Compute arithmetic basket option price without control variant
-        price_without_cv, conf_without_cv = pricer.arithmetic_basket(M, control_variate=False)
+        result = pricer.arithmetic_basket(M, control_variate=False)
+        price_without_cv = result['arithmetic_price']
+        conf_without_cv = result['confidence_interval']
         
         # Compute arithmetic basket option price with control variant
-        price_with_cv, conf_with_cv = pricer.arithmetic_basket(M, control_variate=True)
+        result = pricer.arithmetic_basket(M, control_variate=True)
+        price_with_cv = result['arithmetic_price']
+        conf_with_cv = result['confidence_interval']
         
         # Compute geometric basket option price
-        geometric_price = pricer.geometric_basket()
+        geometric_price = pricer.geometric_basket()['geometric_price']
         
         # Add results to the list
         results.append({
@@ -173,5 +188,5 @@ def test_basket_option_pricer():
     
     return results_df
 
-# 使用Pandas DataFrame显示测试结果
+
 test_basket_option_pricer_df = test_basket_option_pricer()
