@@ -5,7 +5,6 @@ import pandas as pd
  
    
    
-#arithmetic_basket和geometric_basket是你需要的两个函数 @王艺洁
 
 
 
