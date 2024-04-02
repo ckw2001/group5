@@ -2,7 +2,6 @@ import numpy as np
 from scipy.stats import norm
 import pandas as pd
 
-#price_arithmetic_option和price_geometric_option是你需要的两个函数 @王艺洁
 
 
 
